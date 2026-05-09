@@ -19,10 +19,14 @@ class SpyMarketWatcher:
     async def run(self):
         print("Starting monitoring cycle...")
         
-        # 1. 監視設定の取得
+        # 1. 監視設定 & 通知サブスクリプションの取得
         settings_query = self.supabase.table("watch_settings").select("*").eq("is_active", True).execute()
         settings_list = settings_query.data
         
+        subs_query = self.supabase.table("push_subscriptions").select("*").execute()
+        subs_list = subs_query.data or []
+        subscriptions = [s["subscription"] for s in subs_list]
+
         if not settings_list:
             print("No active watch settings found.")
             return
@@ -55,8 +59,15 @@ class SpyMarketWatcher:
                 if not check.data:
                     # 5. 未通知なら通知 & DB保存
                     print(f"New item found: {item['title']} - {item['price']} yen")
-                    self.notifier.notify_item(item)
+                    expired_indices = self.notifier.notify_item(item, subscriptions)
                     
+                    # 無効なサブスクリプションを削除
+                    if expired_indices:
+                        for idx in sorted(expired_indices, reverse=True):
+                            sub_id = subs_list[idx]["id"]
+                            self.supabase.table("push_subscriptions").delete().eq("id", sub_id).execute()
+                            print(f"Deleted expired subscription: {sub_id}")
+
                     self.supabase.table("notified_items").insert({
                         "item_id": item_id,
                         "title": item["title"],

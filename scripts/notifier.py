@@ -1,11 +1,15 @@
 import requests
 import os
-from typing import Optional
+import json
+from typing import Optional, List
+from pywebpush import webpush, WebPushException
 
 class Notifier:
     def __init__(self, line_token: Optional[str] = None, discord_webhook_url: Optional[str] = None):
         self.line_token = line_token or os.getenv("LINE_NOTIFY_TOKEN")
         self.discord_webhook_url = discord_webhook_url or os.getenv("DISCORD_WEBHOOK_URL")
+        self.vapid_private_key = os.getenv("VAPID_PRIVATE_KEY")
+        self.vapid_claims = {"sub": "mailto:sen2205www@gmail.com"}
 
     def send_line(self, message: str):
         if not self.line_token:
@@ -42,8 +46,35 @@ class Notifier:
         except Exception as e:
             print(f"Error sending Discord notification: {e}")
 
-    def notify_item(self, item: dict):
-        """両方のチャンネルへ通知"""
+    def send_web_push(self, subscription: dict, title: str, message: str, url: str):
+        if not self.vapid_private_key:
+            print("VAPID_PRIVATE_KEY not set.")
+            return
+
+        try:
+            webpush(
+                subscription_info=subscription,
+                data=json.dumps({
+                    "title": title,
+                    "body": message,
+                    "url": url,
+                    "icon": "/icons/icon-192x192.png"
+                }),
+                vapid_private_key=self.vapid_private_key,
+                vapid_claims=self.vapid_claims
+            )
+            print("Web Push notification sent.")
+        except WebPushException as ex:
+            print(f"Web Push error: {ex}")
+            # もし 410 Gone なら、そのサブスクリプションは無効なので削除すべき
+            if ex.response and ex.response.status_code == 410:
+                return "expired"
+        except Exception as e:
+            print(f"Error sending Web Push: {e}")
+        return "success"
+
+    def notify_item(self, item: dict, subscriptions: List[dict] = None):
+        """全てのチャンネルへ通知"""
         title = item.get("title", "商品なし")
         price = item.get("price", 0)
         url = item.get("url", "")
@@ -54,3 +85,15 @@ class Notifier:
         
         # Discord用
         self.send_discord(title, price, url)
+
+        # Web Push用
+        if subscriptions:
+            push_title = "💰 新着アイテム発見！"
+            push_msg = f"{title}\n価格: {price:,}円"
+            expired_indices = []
+            for i, sub in enumerate(subscriptions):
+                result = self.send_web_push(sub, push_title, push_msg, url)
+                if result == "expired":
+                    expired_indices.append(i)
+            return expired_indices
+        return []

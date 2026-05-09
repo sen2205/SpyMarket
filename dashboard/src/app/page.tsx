@@ -38,10 +38,66 @@ export default function Dashboard() {
     max_price: 100000,
   });
 
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+
   useEffect(() => {
     fetchSettings();
     fetchNotifiedItems();
+    checkSubscription();
   }, []);
+
+  async function checkSubscription() {
+    if (typeof window !== "undefined" && 'serviceWorker' in navigator && 'PushManager' in window) {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      setIsSubscribed(!!subscription);
+    }
+  }
+
+  async function subscribeToPush() {
+    setSubscriptionLoading(true);
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        throw new Error("このブラウザはプッシュ通知をサポートしていません。");
+      }
+
+      const registration = await navigator.serviceWorker.ready;
+      
+      const publicVapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!publicVapidKey) throw new Error("VAPID public key is missing");
+
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
+      });
+
+      const { error } = await supabase
+        .from("push_subscriptions")
+        .insert([{ subscription }]);
+
+      if (error) throw error;
+      
+      setIsSubscribed(true);
+      alert("通知が有効になりました！");
+    } catch (err: any) {
+      console.error("Push subscription failed:", err);
+      alert(`通知の設定に失敗しました: ${err.message}`);
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  }
+
+  function urlBase64ToUint8Array(base64String: string) {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  }
 
   async function fetchSettings() {
     setLoading(true);
@@ -140,7 +196,7 @@ export default function Dashboard() {
                   activeTab === "settings" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
                 }`}
               >
-                監視リスト
+                監視
               </button>
               <button
                 onClick={() => setActiveTab("history")}
@@ -148,9 +204,20 @@ export default function Dashboard() {
                   activeTab === "history" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
                 }`}
               >
-                ヒット履歴
+                履歴
               </button>
             </div>
+            {!isSubscribed && (
+              <button
+                onClick={subscribeToPush}
+                disabled={subscriptionLoading}
+                className="ml-2 bg-indigo-50 text-indigo-600 p-2 rounded-xl hover:bg-indigo-100 transition-all active:scale-95 flex items-center gap-2"
+                title="通知を有効にする"
+              >
+                <Bell size={18} className={subscriptionLoading ? "animate-pulse" : ""} />
+                <span className="text-xs font-bold hidden md:inline">通知を有効化</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
