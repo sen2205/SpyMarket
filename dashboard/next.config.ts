@@ -12,7 +12,9 @@ const withPWA = require("@ducanh2912/next-pwa").default({
 });
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  experimental: {
+    turbopack: {},
+  },
 };
 
 export default withPWA(nextConfig);
