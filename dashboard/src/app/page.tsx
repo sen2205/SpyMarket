@@ -250,22 +250,80 @@ export default function Dashboard() {
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700">必須キーワード</label>
-                    <input
-                      type="text"
-                      className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                      value={formData.keyword_and}
-                      onChange={(e) => setFormData({ ...formData, keyword_and: e.target.value })}
-                    />
+                    <label className="text-sm font-semibold text-slate-700">必須キーワード (Enterで追加)</label>
+                    <div className="w-full px-2 py-2 rounded-xl border border-slate-200 focus-within:ring-2 focus-within:ring-indigo-500 bg-white transition-all min-h-[42px] flex flex-wrap gap-2">
+                      {formData.keyword_and.split(",").filter(Boolean).map((tag, idx) => (
+                        <span key={idx} className="bg-indigo-50 text-indigo-600 px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 group">
+                          {tag}
+                          <button
+                            onClick={() => {
+                              const tags = formData.keyword_and.split(",").filter(Boolean);
+                              tags.splice(idx, 1);
+                              setFormData({ ...formData, keyword_and: tags.join(",") });
+                            }}
+                            className="hover:text-indigo-800"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                      <input
+                        type="text"
+                        placeholder={formData.keyword_and ? "" : "例: iPhone 15"}
+                        className="flex-1 min-w-[120px] outline-none text-sm px-2"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            const val = e.currentTarget.value.trim();
+                            if (val) {
+                              const currentTags = formData.keyword_and.split(",").filter(Boolean);
+                              if (!currentTags.includes(val)) {
+                                setFormData({ ...formData, keyword_and: [...currentTags, val].join(",") });
+                              }
+                              e.currentTarget.value = "";
+                            }
+                          }
+                        }}
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700">除外キーワード</label>
-                    <input
-                      type="text"
-                      className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                      value={formData.keyword_not}
-                      onChange={(e) => setFormData({ ...formData, keyword_not: e.target.value })}
-                    />
+                    <label className="text-sm font-semibold text-slate-700">除外キーワード (Enterで追加)</label>
+                    <div className="w-full px-2 py-2 rounded-xl border border-slate-200 focus-within:ring-2 focus-within:ring-indigo-500 bg-white transition-all min-h-[42px] flex flex-wrap gap-2">
+                      {formData.keyword_not.split(",").filter(Boolean).map((tag, idx) => (
+                        <span key={idx} className="bg-rose-50 text-rose-600 px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 group">
+                          {tag}
+                          <button
+                            onClick={() => {
+                              const tags = formData.keyword_not.split(",").filter(Boolean);
+                              tags.splice(idx, 1);
+                              setFormData({ ...formData, keyword_not: tags.join(",") });
+                            }}
+                            className="hover:text-rose-800"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                      <input
+                        type="text"
+                        placeholder={formData.keyword_not ? "" : "例: ジャンク品"}
+                        className="flex-1 min-w-[120px] outline-none text-sm px-2"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            const val = e.currentTarget.value.trim();
+                            if (val) {
+                              const currentTags = formData.keyword_not.split(",").filter(Boolean);
+                              if (!currentTags.includes(val)) {
+                                setFormData({ ...formData, keyword_not: [...currentTags, val].join(",") });
+                              }
+                              e.currentTarget.value = "";
+                            }
+                          }
+                        }}
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700">最低価格 (円)</label>

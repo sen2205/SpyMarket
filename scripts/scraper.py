@@ -10,7 +10,7 @@ class PayPayScraper:
     def __init__(self, headless: bool = True):
         self.headless = headless
 
-    async def search(self, keyword: str, min_price: int = 0, max_price: int = 9999999) -> List[Dict]:
+    async def search(self, keyword_and: str, keyword_not: str = "", min_price: int = 0, max_price: int = 9999999) -> List[Dict]:
         """
         PayPayフリマをスクレイピングして商品情報を取得する
         """
@@ -21,67 +21,94 @@ class PayPayScraper:
             )
             page = await context.new_page()
 
-            # URL構築
-            # スペースを%20に変換し、販売中のみ(&open=1)を指定
-            encoded_keyword = keyword.replace(" ", "%20")
-            search_url = f"{self.BASE_URL}/search/{encoded_keyword}?minPrice={min_price}&maxPrice={max_price}&open=1"
+            # URL用の検索キーワード（カンマをスペースに変換して検索効率を上げる）
+            search_query = keyword_and.replace(",", " ")
+            encoded_query = search_query.replace(" ", "%20")
+            search_url = f"{self.BASE_URL}/search/{encoded_query}?minPrice={min_price}&maxPrice={max_price}&open=1"
             
             print(f"Searching: {search_url}")
+            
+            # 判定用のキーワードリスト（カンマ区切り）
+            include_tags = [k.strip().lower() for k in keyword_and.split(",") if k.strip()]
+            exclude_tags = [k.strip().lower() for k in keyword_not.split(",") if k.strip()]
             
             try:
                 await page.goto(search_url, wait_until="networkidle", timeout=30000)
                 
-                items = []
-                # 検索結果エリア（メインのグリッド）に絞り込む
+                results = []
+                # 検索結果のアイテム要素を取得
                 item_elements = await page.query_selector_all('div[class*="SearchGrid"] a[href^="/item/"], #search-results a[href^="/item/"], div[class*="items_SearchItems"] a[href^="/item/"]')
-                
                 if not item_elements:
                     item_elements = await page.query_selector_all('main a[href^="/item/"]')
                 
-                # キーワード群（スペース区切り）を取得
-                keywords = [k.lower() for k in keyword.split() if k]
-                
-                for el in item_elements:
+                # 最新10件に絞って詳細チェック（個別ページを開くため）
+                for el in item_elements[:10]:
                     try:
                         href = await el.get_attribute("href")
                         if not href: continue
-                            
-                        # タイトル (imgのalt属性)
+                        item_id = href.split('/')[-1]
+                        
+                        # SOLDラベルの簡易チェック（リスト画面）
+                        is_sold_fast = await el.query_selector('text="SOLD"')
+                        if is_sold_fast: continue
+
+                        # タイトルと画像
                         img_el = await el.query_selector('img')
                         title = await img_el.get_attribute("alt") if img_el else "No Title"
                         image_url = await img_el.get_attribute("src") if img_el else ""
                         
-                        # 精度向上: 商品名にキーワードのすべてが含まれていなければスキップ（完璧なAND一致）
-                        if not all(k in title.lower() for k in keywords):
-                            continue
-
-                        item_id = href.split('/')[-1]
-                        url = f"{self.BASE_URL}{href}"
-                        
-                        # 売り切れチェック
-                        # "SOLD" というテキストを含む要素があるか確認
-                        is_sold = await el.query_selector('text="SOLD"')
-                        if is_sold:
-                            continue
-
-                        # 価格 (<p>タグ内のテキスト)
-                        price_el = await el.query_selector('p')
+                        # 価格
+                        price_el = await el.query_selector('p[class*="Price"]') or await el.query_selector('p')
                         price_text = await price_el.inner_text() if price_el else "0"
-                        # 数字のみ抽出
                         price = int(re.sub(r'[^\d]', '', price_text)) if price_text else 0
-                        
-                        items.append({
+
+                        # 個別ページに飛んで説明文を取得
+                        detail_url = f"{self.BASE_URL}/item/{item_id}"
+                        detail_page = await context.new_page()
+                        try:
+                            await detail_page.goto(detail_url, wait_until="domcontentloaded", timeout=15000)
+                            
+                            # 説明文の取得
+                            desc_el = await detail_page.query_selector('[class*="ItemDescription__container"], #itemDescriptionContainer')
+                            description = await desc_el.inner_text() if desc_el else ""
+                            
+                            # 判定対象テキスト
+                            full_text = (title + " " + description).lower()
+                            
+                            # 精密な売り切れチェック
+                            is_sold_detail = await detail_page.query_selector('text="完売しました"')
+                            if is_sold_detail:
+                                await detail_page.close()
+                                continue
+
+                            # キーワード判定（すべて含まれているか）
+                            if not all(tag in full_text for tag in include_tags):
+                                await detail_page.close()
+                                continue
+                                
+                            # 除外ワード判定（一つでもあればアウト）
+                            if any(tag in full_text for tag in exclude_tags):
+                                await detail_page.close()
+                                continue
+
+                        except Exception as e:
+                            print(f"Error checking detail page {item_id}: {e}")
+                        finally:
+                            await detail_page.close()
+
+                        results.append({
                             "id": item_id,
                             "title": title,
                             "price": price,
-                            "url": url,
+                            "url": detail_url,
                             "image_url": image_url
                         })
+                        
                     except Exception as e:
-                        print(f"Error parsing item: {e}")
+                        print(f"Error parsing item in list: {e}")
                         continue
                 
-                return items
+                return results
 
             except Exception as e:
                 print(f"Scraping error: {e}")
@@ -90,11 +117,11 @@ class PayPayScraper:
                 await browser.close()
 
 if __name__ == "__main__":
-    # 単体テスト用
     async def test():
         scraper = PayPayScraper(headless=True)
-        results = await scraper.search("iphone", max_price=50000)
-        for item in results[:5]:
-            print(item)
+        # テスト実行
+        results = await scraper.search("iphone 15", "ジャンク,画面割れ", max_price=150000)
+        for item in results:
+            print(f"Found: {item['title']} - {item['price']}円")
             
     asyncio.run(test())

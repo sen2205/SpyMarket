@@ -39,20 +39,16 @@ class SpyMarketWatcher:
             
             print(f"Monitoring: {keyword} ({min_price} - {max_price} yen)")
             
-            # 2. スクレイピング実行
-            found_items = await self.scraper.search(keyword, min_price, max_price)
+            # 2. スクレイピング実行 (説明文チェック & 除外ワード判定も含む)
+            found_items = await self.scraper.search(
+                keyword, 
+                settings.get("keyword_not", ""), 
+                min_price, 
+                max_price
+            )
             
             for item in found_items:
-                # 3. フィルタリング (除外ワード)
-                should_skip = False
-                for ex in exclude_keywords:
-                    if ex.lower() in item["title"].lower():
-                        should_skip = True
-                        break
-                if should_skip:
-                    continue
-                
-                # 4. 重複チェック (Supabase)
+                # 3. 重複チェック (Supabase)
                 item_id = item["id"]
                 check = self.supabase.table("notified_items").select("item_id").eq("item_id", item_id).execute()
                 
