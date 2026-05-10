@@ -1,11 +1,64 @@
 @import "tailwindcss";
 
+@theme {
+  --color-indigo-premium: #4f46e5;
+  --color-slate-premium: #0f172a;
+}
+
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
 }
 
 body {
-  background: var(--background);
+  background: radial-gradient(circle at top right, #eef2ff, #f8fafc);
   color: var(--foreground);
+  min-height: 100vh;
+}
+
+/* プレミアムUI用のユーティリティ */
+@layer components {
+  .glass-header {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  }
+  
+  .premium-card {
+    background: white;
+    border: 1px solid #f1f5f9;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .premium-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 20px 25px -5px rgba(79, 70, 229, 0.1), 0 10px 10px -5px rgba(79, 70, 229, 0.04);
+    border-color: #e0e7ff;
+  }
+
+  .status-pulse {
+    position: relative;
+    display: flex;
+    height: 8px;
+    width: 8px;
+  }
+
+  .status-pulse-inner {
+    animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+    position: absolute;
+    display: inline-flex;
+    height: 100%;
+    width: 100%;
+    border-radius: 9999px;
+    background-color: #10b981;
+    opacity: 0.75;
+  }
+
+  @keyframes ping {
+    75%, 100% {
+      transform: scale(2);
+      opacity: 0;
+    }
+  }
 }
