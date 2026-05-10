@@ -287,7 +287,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-3">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <Tag size={14} /> 必須キーワード
+                      <Tag size={14} /> 必須キーワード <span className="text-indigo-400 text-[10px] normal-case font-bold">(すべて含む)</span>
                     </label>
                     <div className="w-full p-2 rounded-2xl border-2 border-slate-100 focus-within:border-indigo-500 bg-slate-50/50 transition-all min-h-[56px] flex flex-wrap gap-2 items-center group">
                       {formData.keyword_and.split(",").filter(Boolean).map((tag, idx) => (
@@ -340,7 +340,7 @@ export default function Dashboard() {
 
                   <div className="space-y-3">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <AlertCircle size={14} /> 除外キーワード
+                      <AlertCircle size={14} /> 除外キーワード <span className="text-rose-400 text-[10px] normal-case font-bold">(どれか含めば除外)</span>
                     </label>
                     <div className="w-full p-2 rounded-2xl border-2 border-slate-100 focus-within:border-rose-500 bg-slate-50/50 transition-all min-h-[56px] flex flex-wrap gap-2 items-center group">
                       {formData.keyword_not.split(",").filter(Boolean).map((tag, idx) => (
