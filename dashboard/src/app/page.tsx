@@ -174,6 +174,13 @@ export default function Dashboard() {
     else fetchSettings();
   }
 
+  async function clearHistory(settingId: string) {
+    if (!confirm("このワードのヒット履歴をすべて削除しますか？")) return;
+    const { error } = await supabase.from("notified_items").delete().eq("setting_id", settingId);
+    if (error) alert(error.message);
+    else fetchNotifiedItems();
+  }
+
   const toggleExpand = (id: string) => {
     setExpandedSettings(prev => ({ ...prev, [id]: !prev[id] }));
   };
@@ -399,7 +406,17 @@ export default function Dashboard() {
 
                       {isExpanded && (
                         <div className="bg-slate-50/50 px-5 py-4 border-t border-slate-50 animate-in slide-in-from-top-2 duration-300">
-                          <h3 className="text-[10px] font-bold text-slate-400 uppercase mb-3">このワードでのヒット履歴</h3>
+                          <div className="flex justify-between items-center mb-3">
+                            <h3 className="text-[10px] font-bold text-slate-400 uppercase">このワードでのヒット履歴</h3>
+                            {myHits.length > 0 && (
+                              <button 
+                                onClick={() => clearHistory(setting.id)}
+                                className="text-[10px] text-rose-500 hover:text-rose-700 font-bold flex items-center gap-1 transition-colors"
+                              >
+                                <Trash2 size={10} /> 履歴をクリア
+                              </button>
+                            )}
+                          </div>
                           {myHits.length === 0 ? (
                             <p className="text-xs text-slate-300 italic">まだヒットはありません</p>
                           ) : (

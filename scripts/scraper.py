@@ -69,7 +69,7 @@ class PayPayScraper:
                             await detail_page.goto(detail_url, wait_until="domcontentloaded", timeout=15000)
                             
                             # 説明文の取得
-                            desc_el = await detail_page.query_selector('[class*="ItemDescription__container"], #itemDescriptionContainer')
+                            desc_el = await detail_page.query_selector('.ItemText__Text, [class*="ItemText__Text"], [class*="ItemDescription__container"]')
                             description = await desc_el.inner_text() if desc_el else ""
                             
                             # 判定対象テキスト
