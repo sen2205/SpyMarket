@@ -2,12 +2,13 @@ name: SpyMarket Watcher
 
 on:
   schedule:
-    - cron: '*/10 * * * *'  # 10分おき
+    - cron: '0 * * * *'  # 1時間おきに起動
   workflow_dispatch:      # 手動実行用
 
 jobs:
   watch:
     runs-on: ubuntu-22.04
+    timeout-minutes: 70   # 1時間+αでタイムアウト設定
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -33,4 +34,4 @@ jobs:
           LINE_NOTIFY_TOKEN: ${{ secrets.LINE_NOTIFY_TOKEN }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
-        run: python scripts/watcher.py
+        run: python scripts/watcher.py 6
