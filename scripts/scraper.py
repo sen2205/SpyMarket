@@ -10,10 +10,13 @@ class PayPayScraper:
     def __init__(self, headless: bool = True):
         self.headless = headless
 
-    async def search(self, keyword_and: str, keyword_not: str = "", min_price: int = 0, max_price: int = 9999999) -> List[Dict]:
+    async def search(self, keyword_and: str, keyword_not: str = "", min_price: int = 0, max_price: int = 9999999, exclude_ids: List[str] = None) -> List[Dict]:
         """
         PayPayフリマをスクレイピングして商品情報を取得する
         """
+        if exclude_ids is None:
+            exclude_ids = []
+
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=self.headless)
             context = await browser.new_context(
@@ -41,13 +44,17 @@ class PayPayScraper:
                 if not item_elements:
                     item_elements = await page.query_selector_all('main a[href^="/item/"]')
                 
-                # 最新10件に絞って詳細チェック（個別ページを開くため）
+                # 最新10件に絞って詳細チェック
                 for el in item_elements[:10]:
                     try:
                         href = await el.get_attribute("href")
                         if not href: continue
                         item_id = href.split('/')[-1]
                         
+                        # すでに通知済みの場合は詳細チェックをスキップ
+                        if item_id in exclude_ids:
+                            continue
+
                         # SOLDラベルの簡易チェック（リスト画面）
                         is_sold_fast = await el.query_selector('text="SOLD"')
                         if is_sold_fast: continue
@@ -101,7 +108,8 @@ class PayPayScraper:
                             "title": title,
                             "price": price,
                             "url": detail_url,
-                            "image_url": image_url
+                            "image_url": image_url,
+                            "description": description
                         })
                         
                     except Exception as e:

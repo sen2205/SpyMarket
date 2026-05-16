@@ -5,9 +5,10 @@ from typing import Optional, List
 from pywebpush import webpush, WebPushException
 
 class Notifier:
-    def __init__(self, line_token: Optional[str] = None, discord_webhook_url: Optional[str] = None):
+    def __init__(self, line_token: Optional[str] = None, discord_webhook_url: Optional[str] = None, discord_error_webhook_url: Optional[str] = None):
         self.line_token = line_token or os.getenv("LINE_NOTIFY_TOKEN")
         self.discord_webhook_url = discord_webhook_url or os.getenv("DISCORD_WEBHOOK_URL")
+        self.discord_error_webhook_url = discord_error_webhook_url or os.getenv("DISCORD_ERROR_WEBHOOK_URL")
         self.vapid_private_key = os.getenv("VAPID_PRIVATE_KEY")
         self.vapid_claims = {"sub": "mailto:sen2205www@gmail.com"}
 
@@ -25,15 +26,28 @@ class Notifier:
         except Exception as e:
             print(f"Error sending LINE notification: {e}")
 
-    def send_discord(self, title: str, price: int, item_url: str):
+    def send_discord(self, title: str, price: int, item_url: str, settings: Optional[dict] = None, analysis: Optional[dict] = None):
         if not self.discord_webhook_url:
             return
         
+        description = f"価格: {price:,}円\n[商品ページはこちら]({item_url})"
+        
+        if settings:
+            kw = settings.get("keyword_and", "不明")
+            min_p = settings.get("min_price", 0)
+            max_p = settings.get("max_price", 9999999)
+            description += f"\n\n**【検索設定】**\nキーワード: `{kw}`\n価格帯: `{min_p:,} 〜 {max_p:,}円`"
+
+        if analysis:
+            summary = analysis.get("summary", "")
+            advice = analysis.get("advice", "")
+            description += f"\n\n**【LLM分析結果】**\n{summary}\n\n**【購入時の注意点】**\n{advice}"
+
         payload = {
             "embeds": [
                 {
                     "title": f"💰新着アイテム: {title}",
-                    "description": f"価格: {price:,}円\n[商品ページはこちら]({item_url})",
+                    "description": description,
                     "color": 5814783,  # Discord Blue-ish
                     "url": item_url
                 }
@@ -46,7 +60,30 @@ class Notifier:
         except Exception as e:
             print(f"Error sending Discord notification: {e}")
 
+    def send_error(self, message: str):
+        # ... (unchanged)
+        webhook_url = self.discord_error_webhook_url or self.discord_webhook_url
+        if not webhook_url:
+            return
+
+        payload = {
+            "embeds": [
+                {
+                    "title": "⚠️ SpyMarket 実行エラー",
+                    "description": f"```{message}```",
+                    "color": 16711680,  # Red
+                }
+            ]
+        }
+        try:
+            response = requests.post(webhook_url, json=payload)
+            response.raise_for_status()
+            print("Error notification sent to Discord.")
+        except Exception as e:
+            print(f"Failed to send error notification: {e}")
+
     def send_web_push(self, subscription: dict, title: str, message: str, url: str):
+        # ... (unchanged)
         if not self.vapid_private_key:
             print("VAPID_PRIVATE_KEY not set.")
             return
@@ -73,18 +110,23 @@ class Notifier:
             print(f"Error sending Web Push: {e}")
         return "success"
 
-    def notify_item(self, item: dict, subscriptions: List[dict] = None):
+    def notify_item(self, item: dict, subscriptions: List[dict] = None, settings: Optional[dict] = None, analysis: Optional[dict] = None):
         """全てのチャンネルへ通知"""
         title = item.get("title", "商品なし")
         price = item.get("price", 0)
         url = item.get("url", "")
         
         # LINE用メッセージ
-        line_msg = f"\n💰新着アイテム\n{title}\n価格: {price:,}円\n{url}"
+        line_msg = f"\n💰新着アイテム\n{title}\n価格: {price:,}円"
+        if settings:
+            line_msg += f"\n(設定: {settings.get('keyword_and', '不明')})"
+        if analysis:
+            line_msg += f"\n\n分析要約: {analysis.get('summary', '')[:100]}"
+        line_msg += f"\n{url}"
         self.send_line(line_msg)
         
         # Discord用
-        self.send_discord(title, price, url)
+        self.send_discord(title, price, url, settings, analysis)
 
         # Web Push用
         if subscriptions:
