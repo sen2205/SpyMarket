@@ -2,19 +2,19 @@ name: SpyMarket Watcher
 
 on:
   schedule:
-    - cron: '27 * * * *'  # 毎時27分に起動（混雑回避のため中途半端な分に設定）
+    - cron: '*/10 * * * *'  # 10分おきに起動
   workflow_dispatch:      # 手動実行用
 
 jobs:
   watch:
     runs-on: ubuntu-22.04
-    timeout-minutes: 90   # 1.5時間でタイムアウト設定（最適化済みだが余裕を持たせる）
+    timeout-minutes: 20   # 1サイクル分のタイムアウト（スクレイピング込みで余裕を持たせる）
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -36,6 +36,6 @@ jobs:
           DISCORD_ERROR_WEBHOOK_URL: ${{ secrets.DISCORD_ERROR_WEBHOOK_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
-        run: python scripts/watcher.py 5
+        run: python scripts/watcher.py 1
 
 
